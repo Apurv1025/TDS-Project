@@ -181,18 +181,18 @@ def execute_extracted_code(code):
     except Exception as e:
         print(f"Error during code execution: {e}")
 
-def image_process(base64_imgs):
+def image_process(image_url):
     response = requests.post(
             "http://aiproxy.sanand.workers.dev/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {API_KEY}"},
             json={
                 "model": "gpt-4o-mini",
                 "messages": [
-                    {"role": "system", "content": "Given are Base64 encoded graphs based on some data in json form analyse them in an engaging way"},
-                    {"role": "user", "content": base64_imgs}
-                ]
-            }
-        )
+                    {"role": "system", "content": "Analyse the image provided for data insights in an engaging way."},
+                    { "role":"user","content": [{"type": "image_url", "image_url": {"url": image_url,"detail": "low"}}]}
+                    ]
+                    }
+                    )
     datar=response.json()
     choices_content = [choice['message']['content'] for choice in datar.get('choices', [])]
     sresp=""
@@ -211,20 +211,29 @@ code_2=extract_python_code(token_3)
 execute_extracted_code(code_2)
 first_row_response,token_4=describe_data(first_row_of_data)
 
-# GET IMAGE PATH AND CONVERSION FOR VISION ANLYSIS
-current_directory = os.getcwd()
-files_in_directory = os.listdir(current_directory)
-png_files = [file for file in files_in_directory if file.endswith('.png')]
-def encode_image_to_base64(image_path):
-    with open(image_path, "rb") as image_file:
-        # Read the image file and encode it to base64
-        encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
-    return encoded_string
-images_base64 = {os.path.basename(file): encode_image_to_base64(os.path.join(current_directory, file)) for file in png_files}
+# GET IMAGE PATH 
+github_repo_url = "https://github.com/Apurv1025/TDS-Project/raw/main/"
+current_directory = "./"  # Current directory where the images are stored
 
-image_response,token_5=image_process(images_base64)
-image_json_object = json.dumps(images_base64, indent = 4)
-# Generate README.md
+# List to store URLs of PNG files
+png_urls = []
+
+# Loop through all files in the current directory
+for filename in os.listdir(current_directory):
+    if filename.endswith(".png"):
+        file_path = os.path.join(current_directory, filename)
+        # Construct the URL for each PNG file
+        url = github_repo_url + os.path.relpath(file_path, "./").replace("\\", "/")
+        png_urls.append(url)
+
+image_text,image_tokens=[],[]
+for url in png_urls:
+    image_resp,img_token=image_process(url)
+    image_text.append(image_resp)
+    image_tokens.append(img_token)
+
+
+
 
 with open("README.md", "w") as f:
     f.write("\n\n## Basic description of data ##\n\n")
@@ -240,9 +249,9 @@ with open("README.md", "w") as f:
     # f.write("\n\n#Tokens used are given below\n")
     # f.write(str(token_2['usage']))
     f.write("\n\n## Basic analysis of images ##\n\n")
-    f.write(str(image_response))
+    f.write(str(image_text))
     f.write("\n\n#Tokens used are given below\n")
-    f.write(str(token_5))
+    f.write(str(image_tokens))
     # f.write("\n\n## Visualizations\n")
     # f.write(str(heatmap_mat_code))
 
