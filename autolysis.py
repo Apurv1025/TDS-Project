@@ -80,9 +80,9 @@ def heatmap_code(statistics):
         sresp+=(f"\n{content}\n")
     return sresp,datar
 
-# feature importance analysis-do pca
+# redudant features / elimination-openai function calling
 
-#cluster analysis-- Make a function
+#cluster analysis-- Make a function and say
 
 #AI call for Data description
 first_row_of_data=data.iloc[0].to_json()
@@ -141,6 +141,7 @@ def further_analysis(statistics):
                      I also need you to save the plotted figures locally in current directory .Avoid making boxplots and heatmaps.
                      Do not plot the figures that will be difficult to interpret.
                      Properly label and colourize all plots.Do not use plt.show.
+                     Only plot upto 10 most important charts.
                      My python dataframe is called 'data' so cater the code for it.'''},
                     {"role": "user", "content": statistics}
                 ]
@@ -182,14 +183,21 @@ def execute_extracted_code(code):
         print(f"Error during code execution: {e}")
 
 def image_process(image_url):
+    # Function to encode the image
+    def encode_image(image_path):
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+
+    # Getting the base64 string
+    base64_image = encode_image(image_url)
     response = requests.post(
             "http://aiproxy.sanand.workers.dev/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {API_KEY}"},
             json={
                 "model": "gpt-4o-mini",
                 "messages": [
-                    {"role": "system", "content": "Analyse the image provided for data insights in an engaging way."},
-                    { "role":"user","content": [{"type": "image_url", "image_url": {"url": image_url,"detail": "low"}}]}
+                    {"role": "system", "content": "Analyse the image provided for data insights in an engaging way.Also talk about real life implications from our analysis in and engaging manner."},
+                    { "role":"user","content": [{"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{base64_image}","detail": "low"}}]}
                     ]
                     }
                     )
@@ -199,7 +207,7 @@ def image_process(image_url):
     # Print the extracted content
     for index, content in enumerate(choices_content):
         sresp+=(f"\n{content}\n")
-    return sresp,datar
+    return sresp,datar,image_url
 
 #Run analysis functions on dataset
 summary_response,token_1=basic_desc(summary)
@@ -212,8 +220,7 @@ execute_extracted_code(code_2)
 first_row_response,token_4=describe_data(first_row_of_data)
 
 # GET IMAGE PATH 
-github_repo_url = "https://github.com/Apurv1025/TDS-Project/raw/main/"
-current_directory = "./"  # Current directory where the images are stored
+current_directory = "./" 
 
 # List to store URLs of PNG files
 png_urls = []
@@ -223,14 +230,17 @@ for filename in os.listdir(current_directory):
     if filename.endswith(".png"):
         file_path = os.path.join(current_directory, filename)
         # Construct the URL for each PNG file
-        url = github_repo_url + os.path.relpath(file_path, "./").replace("\\", "/")
+        url = os.path.relpath(file_path, "./").replace("\\", "/")
         png_urls.append(url)
 
-image_text,image_tokens=[],[]
+print(png_urls)
+
+image_text,image_tokens,order_titles=[],[],[]
 for url in png_urls:
-    image_resp,img_token=image_process(url)
+    image_resp,img_token,title=image_process(url)
     image_text.append(image_resp)
     image_tokens.append(img_token)
+    order_titles.append(title)
 
 
 
@@ -249,9 +259,11 @@ with open("README.md", "w") as f:
     # f.write("\n\n#Tokens used are given below\n")
     # f.write(str(token_2['usage']))
     f.write("\n\n## Basic analysis of images ##\n\n")
-    f.write(str(image_text))
-    f.write("\n\n#Tokens used are given below\n")
-    f.write(str(image_tokens))
+    for i in range(len(image_text)):
+        f.write(f'## {order_titles[i]} ##\n')
+        f.write(str(image_text[i])+'\n\n')
+    # f.write("\n\n#Tokens used are given below\n")
+    # f.write(str(image_tokens))
     # f.write("\n\n## Visualizations\n")
     # f.write(str(heatmap_mat_code))
 
